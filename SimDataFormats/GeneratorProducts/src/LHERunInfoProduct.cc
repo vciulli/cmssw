@@ -257,9 +257,13 @@ bool LHERunInfoProduct::mergeProduct(const LHERunInfoProduct &other)
 
 	// still not compatible after fixups
 	if (!compatibleHeaders) {
+	  /*
 		throw cms::Exception("ProductsNotMergeable")
 			<< "Error in LHERunInfoProduct: LHE headers differ. "
 			   "Cannot merge products." << std::endl;
+	  */
+	  std::cout << "Cannot merge products." << std::endl;
+	  return false;
 	}
 
 	// it is exactly the same, so merge

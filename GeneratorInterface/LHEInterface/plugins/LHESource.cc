@@ -181,12 +181,15 @@ LHESource::readEvent_(edm::EventPrincipal& eventPrincipal) {
 		              	product.get(), _1));
 
 		if (!runInfoProducts.empty()) {
-			runInfoProducts.front().mergeProduct(*product);
+		  if (runInfoProducts.front().mergeProduct(*product)) {
 			if (!wasMerged) {
 				runInfoProducts.pop_front();
 				runInfoProducts.push_front(product);
 				wasMerged = true;
 			}
+		  } else {
+		    resetRunAuxiliary();		    
+		  }
 		}
 
 		runInfo.reset();
