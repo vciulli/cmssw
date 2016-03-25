@@ -19,7 +19,8 @@ _outFileName(pset.getParameter<std::string>("OutputFile")),
 //decide whether to finlaize tthe plots or not.
 //deciding not to finalize them can be useful for further harvesting of many jobs
 _doFinalize(pset.getParameter<bool>("DoFinalize")),
-_produceDQM(pset.getParameter<bool>("ProduceDQMOutput"))
+_produceDQM(pset.getParameter<bool>("ProduceDQMOutput")),
+_xsection(-1.)
 {
   //retrive the analysis name from paarmeter set
   std::vector<std::string> analysisNames = pset.getParameter<std::vector<std::string> >("AnalysisNames");
@@ -47,11 +48,11 @@ _produceDQM(pset.getParameter<bool>("ProduceDQMOutput"))
   std::set< AnaHandle, CmpAnaHandle >::const_iterator ibeg = analyses.begin();
   std::set< AnaHandle, CmpAnaHandle >::const_iterator iend = analyses.end();
   std::set< AnaHandle, CmpAnaHandle >::const_iterator iana; 
-  double xsection = -1.;
-  xsection = pset.getParameter<double>("CrossSection");
+  _xsection = pset.getParameter<double>("CrossSection");
   for (iana = ibeg; iana != iend; ++iana){
-    if ((*iana)->needsCrossSection())
-    (*iana)->setCrossSection(xsection);
+    if ((*iana)->needsCrossSection()) {
+    (*iana)->setCrossSection(_xsection);
+    }
   }
   if (_produceDQM){
     // book stuff needed for DQM
@@ -87,30 +88,34 @@ void RivetAnalyzer::analyze(const edm::Event& iEvent,const edm::EventSetup& iSet
   iEvent.getByToken(_hepmcCollection, evt);
 
   // get HepMC GenEvent
-  const HepMC::GenEvent *myGenEvent = evt->GetEvent();
+  HepMC::GenEvent * myGenEvent = new HepMC::GenEvent( *(evt->GetEvent()) );
+  //set the cross section if needed
+  if (_xsection > 0){
+    HepMC::GenCrossSection xsec;
+    xsec.set_cross_section(_xsection);
+    myGenEvent->set_cross_section(xsec);
+  }   
   
-  //if you want to use an external weight we have to clone the GenEvent and change the weight  
+  //get the weight from GenEventInfoProduct or the LHEEventProduct if requested
   if ( _useExternalWeight ){
     
-    HepMC::GenEvent * tmpGenEvtPtr = new HepMC::GenEvent( *(evt->GetEvent()) );
-    if (tmpGenEvtPtr->weights().size() == 0) {
+    if (myGenEvent->weights().size() == 0) {
       throw cms::Exception("RivetAnalyzer") << "Original weight container has 0 size ";
     }
-    if (tmpGenEvtPtr->weights().size() > 1) {
-      edm::LogWarning("RivetAnalyzer") << "Original event weight size is " << tmpGenEvtPtr->weights().size() << ". Will change only the first one ";  
+    if (myGenEvent->weights().size() > 1) {
+      edm::LogWarning("RivetAnalyzer") << "Original event weight size is " << myGenEvent->weights().size() << ". Will change only the first one ";  
     }
     
     if(!_useLHEweights){
       edm::Handle<GenEventInfoProduct> genEventInfoProduct;
       iEvent.getByToken(_genEventInfoCollection, genEventInfoProduct);
-      tmpGenEvtPtr->weights()[0] = genEventInfoProduct->weight();
+      myGenEvent->weights()[0] = genEventInfoProduct->weight();
     }else{
       edm::Handle<LHEEventProduct> lheEventHandle;
       iEvent.getByToken(_LHECollection,lheEventHandle);
       const LHEEventProduct::WGT& wgt = lheEventHandle->weights().at(_LHEweightNumber);
-      tmpGenEvtPtr->weights()[0] = wgt.wgt;
+      myGenEvent->weights()[0] = wgt.wgt;
     }
-    myGenEvent = tmpGenEvtPtr;
 
   }
   
